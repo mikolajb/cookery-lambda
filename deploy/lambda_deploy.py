@@ -1,15 +1,14 @@
-# todo: fix dependencies and libraries etc, upload zip, check handler (name, form etc..)
-# todo: Cant fix encoding of zip file or sending zip file, so trying uploading to s3 instead.
+# todo: fix dependencies and libraries etc, check handler (name, form etc..) and get names of handler and file
 
 import sys
 import os
 import boto3
 import zipfile
-import base64
 
 ACCESS_KEY = "***REMOVED***"
 SECRET_KEY = "***REMOVED***"
 REGION = "eu-central-1"
+BUCKET_NAME = "***REMOVED***"
 
 # todo: make it work from everywhere, instead of cwd
 def getDirToDeploy():
@@ -50,41 +49,28 @@ def checkExistingFunctions(client, function_name):
 	return
 
 # http://stackoverflow.com/questions/1855095/how-to-create-a-zip-archive-of-a-directory/
-# todo: fix this so aws lambda recognizes it, because zipping more than 1 file results in a directory----
-# FIXED: Doesnt matter...
 def zipDirectory(dir_to_deploy):
-	zip_file = zipfile.ZipFile((dir_to_deploy + "ing.zip"), 'w', zipfile.ZIP_DEFLATED)
+	zip_name = dir_to_deploy + "_deploy.zip"
+	zip_file = zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED)
 	for root, dirs, files in os.walk("./" + dir_to_deploy):
 		for file in files:
 			zip_file.write(os.path.join(root, file))
 	zip_file.close()
+	return zip_name
+
+def uploadToS3(client, zip_name, bucket_name):
+	client.upload_file(zip_name, bucket_name, zip_name)
 	return
 
-# "the contents of the zip file must be base64-encoded"
-# def encode():
-# 	print(os.getcwd())
-# 	fin = open("test/test.py")
-# 	fout = open("test/test.b64")
-# 	with open('test.zip', 'rb') as fin, open('test.zip.b64', 'w') as fout:
-# 		base64.encode(fin, fout)
-# 	base64.encode(f, open("test/test.b64", "w"))
-# 	f.close()
-
-def uploadToS3(client):
-	client.upload_file("testing.zip", "***REMOVED***", "testing.zip")
-
-def deployLambda(client, dir_to_deploy, function_name):
-	name = (dir_to_deploy + "ing.zip")
+def deployLambda(client, dir_to_deploy, function_name, zip_name):
 	response = client.create_function(
 		FunctionName = function_name,
 		Runtime = "python3.6",
 		Role = "arn:aws:iam::151587718953:role/service-role/testRole",
-		Handler = "test.testHandler",
+		Handler = zip_name[:4] + "/test.testHandler",
 		Code = {
-			# "ZipFile": file_get_contents(str(dir_to_deploy + ".zip"))
-			"S3Bucket": "***REMOVED***",
-			"S3Key": "testing.zip"
-			# 'S3ObjectVersion': 'string'
+			"S3Bucket": BUCKET_NAME,
+			"S3Key": zip_name
 		},
 		Description = "",
 		Timeout = 3,
@@ -110,10 +96,6 @@ def deployLambda(client, dir_to_deploy, function_name):
 	print(response)
 	print("Done!")
 
-def file_get_contents(filename):
-	with open(filename) as f:
-		return f.read()
-
 if __name__ == "__main__":
 	dir_to_deploy = getDirToDeploy()
 	function_name = getFunctionName()
@@ -121,8 +103,7 @@ if __name__ == "__main__":
 	lambda_client = setupLambdaClient()
 	checkExistingFunctions(lambda_client, function_name)
 
-	# encode()
-	zipDirectory(dir_to_deploy)
+	zip_name = zipDirectory(dir_to_deploy)
 	s3_client = setupS3Client()
-	uploadToS3(s3_client)
-	deployLambda(lambda_client, dir_to_deploy, function_name)
+	uploadToS3(s3_client, zip_name, BUCKET_NAME)
+	deployLambda(lambda_client, dir_to_deploy, function_name, zip_name)
