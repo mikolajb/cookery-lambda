@@ -10,11 +10,15 @@ s3 = boto3.client('s3')
 def handler(event, context):
 
     url = "https://apod.nasa.gov/apod/"
-    page = urllib.urlopen(url)
+    with urllib.request.urlopen(url) as page:
+        text = page.readlines()
+
+    contents = [x.decode('UTF-8') for x in text]
 
     image_line = ""
 
-    for line in page:
+    for line in contents:
+        print(line)
         if ".jpg" in line:
             image_line = line
             break
@@ -28,10 +32,10 @@ def handler(event, context):
     file_location = "/tmp/" + file_name
 
     f = open(file_location, 'w')
-    urllib.urlretrieve(url_pic, file_location)
+    urllib.request.urlretrieve(url_pic, file_location)
     f.close()
     # bucket_name = event["bucketname"]
-    bucket_name = "apodresult"
+    bucket_name = ""
 
     s3.upload_file(file_location, bucket_name, file_name)
     return ("Done! Image can be found in the s3 bucket: " + bucket_name +
