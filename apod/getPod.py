@@ -1,6 +1,7 @@
 import urllib
 import boto3
 import datetime
+import tempfile
 
 s3 = boto3.client('s3')
 
@@ -18,7 +19,6 @@ def handler(event, context):
     image_line = ""
 
     for line in contents:
-        print(line)
         if ".jpg" in line:
             image_line = line
             break
@@ -28,15 +28,17 @@ def handler(event, context):
     url_pic = url + "" + ref[1]
     date = datetime.datetime.now()
     file_name = "nasa%s%s%s.jpg" % (date.day, date.month, date.year)
-    # file_name = event["filename"]
-    file_location = "/tmp/" + file_name
-
-    f = open(file_location, 'w')
-    urllib.request.urlretrieve(url_pic, file_location)
-    f.close()
-    # bucket_name = event["bucketname"]
     bucket_name = ""
+    # file_name = event["filename"]
+    # bucket_name = event["bucketname"]
 
-    s3.upload_file(file_location, bucket_name, file_name)
+    # Nested, because flake8 wasn't happy
+    # with urllib.request.urlopen(url_pic) as response,
+    # tempfile.NamedTemporaryFile('wb') as temp:
+    with urllib.request.urlopen(url_pic) as response:
+        with tempfile.NamedTemporaryFile('wb') as temp:
+            temp.write(response.read())
+            s3.upload_file(temp.name, bucket_name, file_name)
+
     return ("Done! Image can be found in the s3 bucket: " + bucket_name +
             " as: " + file_name)
