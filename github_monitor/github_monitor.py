@@ -102,9 +102,10 @@ def handler(event, context):
         print("WARNING: NON EXISTENT REPOSITORY")
         return
 
-    # get all commits
-    count = 0
-    while count < 5:
+    count = 5
+
+    # Get all commits rougly every minute.
+    while count > 0:
         now = datetime.utcnow().replace(microsecond=0)
         url = "https://api.github.com/repos/" + repo["owner"]["login"] + "/" +\
               repo["name"] + "/commits"
@@ -117,8 +118,31 @@ def handler(event, context):
                                         "%Y-%m-%dT%H:%M:%SZ")
 
         check_times(commit_time, now, repo, data)
-        time.sleep(59.0)
-        count += 1
+
+        if count != 1:
+            # Sleep for the evenly divided time that is left for the number of
+            # times to run left.
+            time.sleep(((context.get_remaining_time_in_millis() /
+                         count) / 1000))
+        count -= 1
+
+    # Get all commits with a rough sleep.
+    # count = 0
+    # while count < 5:
+    #     now = datetime.utcnow().replace(microsecond=0)
+    #     url = "https://api.github.com/repos/" + repo["owner"]["login"] + "/" +\
+    #           repo["name"] + "/commits"
+    #     # print("Making a request for: ", url)
+
+    #     data = make_request(url)
+    #     data = json.loads(data)
+
+    #     commit_time = datetime.strptime(data[0]["commit"]["committer"]["date"],
+    #                                     "%Y-%m-%dT%H:%M:%SZ")
+
+    #     check_times(commit_time, now, repo, data)
+    #     time.sleep(59.0)
+    #     count += 1
 
     # Create a time for 5 minutes ago and check if the time of the commit is
     # later.
